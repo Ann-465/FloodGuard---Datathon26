@@ -17,3 +17,4 @@ models/
 *.pt
 *.pth
 *.safetensors
+work/

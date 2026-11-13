@@ -2,7 +2,7 @@
 
 ## Adaptive Flood Intelligence & Response
 
-FloodShift is a backend decision-support prototype for the UTSA Dell Social Impact
+FloodShift is a full-stack decision-support prototype for the UTSA Dell Social Impact
 AI Datathon. It combines changing rainfall conditions, drainage-infrastructure
 features, and **location-verified** visual evidence to estimate evolving risk and
 allocate limited response resources.
@@ -36,10 +36,11 @@ over rainfall-only and infrastructure-only rankings.
   unverified information, and a human-review safety boundary.
 - Observation-freshness discounting, geographic coordinates, and input-freshness
   context in every dashboard update.
-- Seventeen automated unit and integration tests.
-
-The dashboard and rainfall-replay UI remain on the teammate-owned
-`feature/dashboard-replay` branch and are intentionally outside this backend branch.
+- A judge-ready Streamlit operations dashboard with 27-frame historical NOAA
+  playback, three synthetic scenarios, resource controls, real Qwen upload,
+  explainable maps/charts, proposed reallocations, and briefing download.
+- Automated backend, integration, replay-unit, geographic-integrity, allocation,
+  offline-fallback, and Streamlit-startup tests.
 
 ## Architecture
 
@@ -48,6 +49,8 @@ Storm replay rainfall ─┐
 Infrastructure data ───┼─> Risk engine ─> Response candidates ─> Resource optimizer
 Qwen visual evidence ──┘       │                                      │
                                └─ score, provenance, uncertainty       └─ allocated/deferred actions
+                                                │                                  │
+                                                └──── Streamlit Storm Operations ──┘
 ```
 
 ## Quick start with Anaconda
@@ -55,15 +58,14 @@ Qwen visual evidence ──┘       │                                      �
 ```powershell
 conda create -n floodshift python=3.11 pip -y
 conda activate floodshift
-conda install pydantic requests pillow pytest jupyterlab openai python-dotenv -y
-python -m pip install --no-deps --no-build-isolation -e .
+python -m pip install -e ".[dev,dashboard]"
 python -m pytest -q
 python examples/run_demo.py
-python -m jupyterlab
+python -m streamlit run frontend/dashboard.py
 ```
 
-Open `notebooks/FloodShift_demo.ipynb` and select the `floodshift` environment's
-Python kernel.
+The dashboard opens at `http://localhost:8501`. See
+[`docs/JUDGE_DEMO.md`](docs/JUDGE_DEMO.md) for the one-minute demonstration.
 
 ## Shared Qwen3-VL inference
 
