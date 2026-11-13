@@ -1,0 +1,47 @@
+{
+  "scope": "Bexar County day-level rainfall signal vs paid NFIP claim dates, 2018-2025",
+  "days": 2915,
+  "positive_claim_days": 45,
+  "paid_claims": 107,
+  "paid_claim_amount_usd": 3150144.32,
+  "metrics_all_dates": {
+    "airport_only_daily_rainfall": {
+      "roc_auc": 0.7829,
+      "precision_at_positive_count": 0.3556
+    },
+    "multi_gauge_daily_max": {
+      "roc_auc": 0.8634,
+      "precision_at_positive_count": 0.4
+    },
+    "multi_gauge_antecedent_aware": {
+      "roc_auc": 0.8867,
+      "precision_at_positive_count": 0.4222
+    }
+  },
+  "temporal_holdout": {
+    "development_2018_2022": {
+      "days": 1819,
+      "positive_claim_days": 30,
+      "multi_gauge_antecedent_aware": {
+        "roc_auc": 0.894,
+        "precision_at_positive_count": 0.4333
+      }
+    },
+    "holdout_2023_2025": {
+      "days": 1096,
+      "positive_claim_days": 15,
+      "multi_gauge_antecedent_aware": {
+        "roc_auc": 0.8718,
+        "precision_at_positive_count": 0.4
+      }
+    }
+  },
+  "claim_day_mean_max_rain_mm": 46.98,
+  "non_event_day_mean_max_rain_mm": 3.06,
+  "limitations": [
+    "NFIP claims represent insured properties and do not capture every flood impact.",
+    "The claims are county/day outcomes and do not identify which crossing flooded.",
+    "Gauge coverage varies by day and can miss localized rainfall.",
+    "This validates rainfall signal only, not the complete intervention policy."
+  ]
+}

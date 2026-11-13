@@ -1,0 +1,70 @@
+{
+  "scenario_name": "Illustrative San Antonio escalating storm",
+  "data_policy": "All rainfall, visual observations, and urgency labels in this file are synthetic demo inputs.",
+  "resources": {
+    "inspection_teams": 2,
+    "debris_crews": 1,
+    "traffic_units": 1,
+    "emergency_units": 1,
+    "human_reviewers": 2
+  },
+  "steps": [
+    {
+      "timestamp": "2026-11-13T12:00:00-06:00",
+      "rainfall": [
+        {"location_id": "LWC_7070122", "hourly_mm": 12, "previous_3h_mm": 24, "previous_24h_mm": 35},
+        {"location_id": "LWC_7070275", "hourly_mm": 15, "previous_3h_mm": 28, "previous_24h_mm": 38},
+        {"location_id": "LWC_7070194", "hourly_mm": 10, "previous_3h_mm": 20, "previous_24h_mm": 32},
+        {"location_id": "LWC_7070146", "hourly_mm": 8, "previous_3h_mm": 18, "previous_24h_mm": 29},
+        {"location_id": "LWC_7070105", "hourly_mm": 13, "previous_3h_mm": 25, "previous_24h_mm": 36},
+        {"location_id": "LWC_7070274", "hourly_mm": 6, "previous_3h_mm": 14, "previous_24h_mm": 22},
+        {"location_id": "LWC_7070231", "hourly_mm": 11, "previous_3h_mm": 21, "previous_24h_mm": 31},
+        {"location_id": "LWC_7070238", "hourly_mm": 9, "previous_3h_mm": 17, "previous_24h_mm": 27}
+      ],
+      "observations": []
+    },
+    {
+      "timestamp": "2026-11-13T13:00:00-06:00",
+      "rainfall": [
+        {"location_id": "LWC_7070122", "hourly_mm": 35, "previous_3h_mm": 66, "previous_24h_mm": 91},
+        {"location_id": "LWC_7070275", "hourly_mm": 30, "previous_3h_mm": 61, "previous_24h_mm": 88},
+        {"location_id": "LWC_7070194", "hourly_mm": 18, "previous_3h_mm": 40, "previous_24h_mm": 60},
+        {"location_id": "LWC_7070146", "hourly_mm": 20, "previous_3h_mm": 44, "previous_24h_mm": 68},
+        {"location_id": "LWC_7070105", "hourly_mm": 31, "previous_3h_mm": 63, "previous_24h_mm": 89},
+        {"location_id": "LWC_7070274", "hourly_mm": 16, "previous_3h_mm": 38, "previous_24h_mm": 55},
+        {"location_id": "LWC_7070231", "hourly_mm": 28, "previous_3h_mm": 58, "previous_24h_mm": 82},
+        {"location_id": "LWC_7070238", "hourly_mm": 23, "previous_3h_mm": 48, "previous_24h_mm": 72}
+      ],
+      "observations": [
+        {
+          "observation_id": "synthetic-visual-001",
+          "location_id": "LWC_7070194",
+          "observed_at": "2026-11-13T12:55:00-06:00",
+          "analysis_status": "success",
+          "visible_flooding": "yes",
+          "road_obstructed": "yes",
+          "debris_visible": "yes",
+          "visual_severity": 3,
+          "evidence": ["Illustrative input: water covers the road surface", "Illustrative input: debris is visible near the crossing"],
+          "uncertainties": ["Synthetic observation used only to demonstrate integration"],
+          "model_reported_evidence_strength": 0.9,
+          "provenance": "synthetic_demo",
+          "source_name": "Synthetic demo observation",
+          "image_reference": null,
+          "supplied_metadata": {"demo_only": true}
+        }
+      ]
+    }
+  ],
+  "scenario_relevance": {
+    "LWC_7070122": 2,
+    "LWC_7070275": 2,
+    "LWC_7070194": 3,
+    "LWC_7070146": 0,
+    "LWC_7070105": 2,
+    "LWC_7070274": 0,
+    "LWC_7070231": 1,
+    "LWC_7070238": 0
+  }
+}
+
