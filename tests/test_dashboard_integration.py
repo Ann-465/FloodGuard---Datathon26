@@ -4,7 +4,12 @@ from pathlib import Path
 import pytest
 
 from floodshift.infrastructure import load_locations
-from frontend.operations import DEFAULT_RESOURCES, calculate_replay_payloads, catalog_partition
+from frontend.operations import (
+    DEFAULT_RESOURCES,
+    calculate_replay_payloads,
+    catalog_partition,
+    summarize_changes,
+)
 from frontend.storm_replay import build_synthetic_frames, load_historical_frames
 
 
@@ -74,6 +79,18 @@ def test_resource_limits_change_exact_optimizer_allocations():
     assert available_allocated > constrained_allocated
 
 
+def test_change_summary_is_derived_from_consecutive_backend_frames():
+    locations = load_locations()
+    frames = build_synthetic_frames("Flash Flood", [item.location_id for item in locations])
+    payloads = calculate_replay_payloads(frames, 4, locations, DEFAULT_RESOURCES)
+    summary = summarize_changes(payloads[-2], payloads[-1])
+
+    assert not summary["is_baseline"]
+    assert summary["risk_increases"]
+    assert all(item["delta"] > 0 for item in summary["risk_increases"])
+    assert summary["risk_increases"][0]["score"] == payloads[-1]["risk_assessments"][0]["risk_score"]
+
+
 def test_unlocated_image_never_changes_crossing_risk():
     locations = load_locations()
     frames = build_synthetic_frames("Moderate", [item.location_id for item in locations])
@@ -110,12 +127,16 @@ def test_streamlit_dashboard_starts_with_key_controls():
     assert not app.exception
     assert app.title[0].value == "FloodShift · Storm Operations"
     button_labels = {item.label for item in app.button}
+    assert "▶ Start Storm Simulation" in button_labels
+    assert "▶ Resume" in button_labels
     assert "Check Qwen availability" in button_labels
     assert "Add labeled synthetic visual event to selected crossing" in button_labels
     assert app.select_slider
+    assert app.radio[0].value == "Simulated Storm"
+    assert app.session_state["synthetic_scenario"] == "Flash Flood"
+    assert any("What Changed?" in item.value for item in app.subheader)
 
-    app.radio[0].set_value("Simulated Storm").run(timeout=30)
-    next_button = next(item for item in app.button if item.label == "▶|")
+    next_button = next(item for item in app.button if item.label == "Step →")
     app = next_button.click().run(timeout=30)
     assert app.select_slider[1].value == 1
     assert any("Assessment +10 min" in item.value for item in app.caption)

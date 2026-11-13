@@ -80,6 +80,100 @@ def allocation_changes(previous: dict | None, current: dict) -> dict[str, list[s
     }
 
 
+def summarize_changes(previous: dict | None, current: dict) -> dict:
+    """Return backend-derived changes for the judge-facing operations view."""
+    current_assessments = current["risk_assessments"]
+    current_recommendations = current["recommendations"]
+    if previous is None:
+        return {
+            "risk_increases": [],
+            "rank_changes": [],
+            "new_actions": [],
+            "newly_allocated": [],
+            "no_longer_allocated": [],
+            "newly_deferred": [],
+            "is_baseline": True,
+        }
+
+    previous_assessments = {
+        item["location_id"]: item for item in previous["risk_assessments"]
+    }
+    risk_increases = []
+    rank_changes = []
+    for item in current_assessments:
+        before = previous_assessments.get(item["location_id"])
+        if not before:
+            continue
+        delta = round(item["risk_score"] - before["risk_score"], 1)
+        if delta > 0.05:
+            risk_increases.append(
+                {
+                    "location_id": item["location_id"],
+                    "location_name": item["location_name"],
+                    "delta": delta,
+                    "score": item["risk_score"],
+                }
+            )
+        rank_delta = before["rank"] - item["rank"]
+        if rank_delta:
+            rank_changes.append(
+                {
+                    "location_id": item["location_id"],
+                    "location_name": item["location_name"],
+                    "from_rank": before["rank"],
+                    "to_rank": item["rank"],
+                    "places": abs(rank_delta),
+                    "direction": "up" if rank_delta > 0 else "down",
+                }
+            )
+
+    previous_recommendations = {
+        item["recommendation_id"]: item for item in previous["recommendations"]
+    }
+    current_ids = {item["recommendation_id"] for item in current_recommendations}
+    new_actions = [
+        item for item in current_recommendations
+        if item["recommendation_id"] not in previous_recommendations
+    ]
+    newly_deferred = [
+        item for item in current_recommendations
+        if item["allocation_status"] == "deferred_resource_limit"
+        and (
+            item["recommendation_id"] not in previous_recommendations
+            or previous_recommendations[item["recommendation_id"]]["allocation_status"]
+            != "deferred_resource_limit"
+        )
+    ]
+    allocation_delta = allocation_changes(previous, current)
+    recommendations_by_id = {
+        item["recommendation_id"]: item for item in current_recommendations
+    }
+    previous_by_id = {
+        item["recommendation_id"]: item for item in previous["recommendations"]
+    }
+
+    def describe(ids: list[str], source: dict[str, dict]) -> list[dict]:
+        return [source[item_id] for item_id in ids if item_id in source]
+
+    return {
+        "risk_increases": sorted(risk_increases, key=lambda item: item["delta"], reverse=True),
+        "rank_changes": sorted(
+            rank_changes,
+            key=lambda item: (item["direction"] != "up", -item["places"]),
+        ),
+        "new_actions": new_actions,
+        "newly_allocated": describe(
+            allocation_delta["newly_allocated"], recommendations_by_id
+        ),
+        "no_longer_allocated": describe(
+            allocation_delta["no_longer_allocated"], previous_by_id
+        ),
+        "newly_deferred": newly_deferred,
+        "is_baseline": False,
+        "active_action_count": len(current_ids),
+    }
+
+
 def catalog_partition(
     catalog_rows: Iterable[dict],
     scored_locations: Iterable[Location | dict],

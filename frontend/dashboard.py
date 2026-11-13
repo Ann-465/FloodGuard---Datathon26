@@ -19,6 +19,7 @@ from frontend.operations import (
     allocation_changes,
     calculate_replay_payloads,
     catalog_partition,
+    summarize_changes,
 )
 from frontend.storm_replay import (
     SCENARIOS,
@@ -73,6 +74,29 @@ st.markdown(
     .deferred { border-left:4px solid #f27433; }
     .muted { color:#9db4c1; }
     .tiny { font-size:.78rem; color:#9db4c1; }
+    .simulation-banner {
+        background:linear-gradient(100deg, rgba(15,58,78,.98), rgba(11,38,55,.98));
+        border:1px solid #2e7898; border-radius:16px; padding:14px 18px;
+        margin:.25rem 0 .8rem 0; box-shadow:0 10px 28px rgba(0,0,0,.2);
+    }
+    .running-dot {
+        display:inline-block; width:10px; height:10px; border-radius:50%;
+        background:#2dc789; margin-right:8px; box-shadow:0 0 0 5px rgba(45,199,137,.16);
+        animation:pulse 1.2s infinite;
+    }
+    @keyframes pulse { 50% { opacity:.42; transform:scale(.86); } }
+    .change-panel {
+        background:linear-gradient(155deg, rgba(17,53,72,.98), rgba(10,34,49,.98));
+        border:1px solid #3f829e; border-left:5px solid #54d2ff;
+        border-radius:14px; padding:14px 16px; margin-bottom:12px;
+    }
+    .priority-row {
+        background:rgba(12,38,54,.96); border:1px solid #28546a;
+        border-radius:12px; padding:10px 12px; margin-bottom:8px;
+    }
+    .severity-legend { display:flex; gap:14px; flex-wrap:wrap; margin:.25rem 0 .65rem; }
+    .legend-item { font-size:.78rem; color:#bdd1dc; }
+    .legend-dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -97,6 +121,19 @@ def scored_locations():
 def reset_timeline() -> None:
     st.session_state.timeline_index = 0
     st.session_state.playing = False
+    st.session_state.last_tick = time.monotonic()
+
+
+def start_judge_simulation() -> None:
+    st.session_state.playback_mode = "Simulated Storm"
+    st.session_state.synthetic_scenario = "Flash Flood"
+    st.session_state.timeline_index = 0
+    st.session_state.playing = True
+    st.session_state.last_tick = time.monotonic()
+
+
+def toggle_playback() -> None:
+    st.session_state.playing = not st.session_state.playing
     st.session_state.last_tick = time.monotonic()
 
 
@@ -146,7 +183,8 @@ def build_map_rows(assessments: list[dict]) -> list[dict]:
             {
                 **item,
                 "fill_color": SEVERITY_COLORS[item["severity"]],
-                "radius": 120 + item["risk_score"] * 4,
+                "line_color": [255, 255, 255, 255] if change is not None and abs(change) > 0.05 else [150, 188, 205, 190],
+                "radius": 180 + item["risk_score"] * 5 if change is not None and abs(change) > 0.05 else 120 + item["risk_score"] * 4,
                 "trend_label": f"{arrow} {change:+.1f}" if change is not None else "First frame",
                 "score_label": f"{item['risk_score']:.1f}/100",
             }
@@ -192,6 +230,8 @@ for key, value in {
     "timeline_index": 0,
     "playing": False,
     "last_tick": time.monotonic(),
+    "playback_mode": "Simulated Storm",
+    "synthetic_scenario": "Flash Flood",
     "visual_observations": [],
     "last_visual_result": None,
     "qwen_health": None,
@@ -208,7 +248,7 @@ catalog_scored, catalog_unscored = catalog_partition(catalog, locations)
 st.sidebar.markdown("## Storm control")
 mode = st.sidebar.radio(
     "Playback source",
-    ["Historical NOAA Replay", "Simulated Storm"],
+    ["Simulated Storm", "Historical NOAA Replay"],
     key="playback_mode",
     on_change=reset_timeline,
 )
@@ -230,39 +270,19 @@ else:
 maximum_frame = len(frames) - 1
 st.session_state.timeline_index = min(st.session_state.timeline_index, maximum_frame)
 
-st.sidebar.markdown("### Playback")
-speed = st.sidebar.select_slider(
-    "Playback speed",
-    options=[0.5, 1.0, 1.5, 2.0, 3.0],
-    value=1.0,
-    format_func=lambda value: f"{value:g}×",
-)
-control_cols = st.sidebar.columns(4)
-control_cols[0].button(
-    "◀",
-    help="Previous frame",
-    width="stretch",
-    on_click=step_timeline,
-    args=(-1, maximum_frame),
-)
-if control_cols[1].button("▶" if not st.session_state.playing else "Ⅱ", width="stretch"):
-    st.session_state.playing = not st.session_state.playing
-    st.session_state.last_tick = time.monotonic()
-control_cols[2].button(
-    "▶|",
-    help="Next frame",
-    width="stretch",
-    on_click=step_timeline,
-    args=(1, maximum_frame),
-)
-control_cols[3].button("↺", help="Reset", width="stretch", on_click=reset_timeline)
-
-st.sidebar.select_slider(
-    "Timeline frame",
-    options=list(range(len(frames))),
-    key="timeline_index",
-    format_func=lambda index: frames[index]["label"],
-)
+with st.sidebar.expander("Advanced playback controls", expanded=False):
+    speed = st.select_slider(
+        "Playback speed",
+        options=[0.5, 1.0, 1.5, 2.0, 3.0],
+        value=1.0,
+        format_func=lambda value: f"{value:g}×",
+    )
+    st.select_slider(
+        "Timeline frame",
+        options=list(range(len(frames))),
+        key="timeline_index",
+        format_func=lambda index: frames[index]["label"],
+    )
 # Read the authoritative session value after rendering. Streamlit can return the
 # preceding widget value during a button-triggered rerun even though the callback
 # has already advanced the keyed state.
@@ -285,14 +305,14 @@ if st.session_state.playing:
 
     playback_driver()
 
-st.sidebar.markdown("### Available scenario resources")
-resources = {
-    "inspection_teams": st.sidebar.number_input("Inspection teams", 0, 10, 2),
-    "debris_crews": st.sidebar.number_input("Debris crews", 0, 10, 1),
-    "traffic_units": st.sidebar.number_input("Traffic units", 0, 10, 1),
-    "emergency_units": st.sidebar.number_input("Emergency units", 0, 10, 1),
-    "human_reviewers": st.sidebar.number_input("Human reviewers", 0, 10, 2),
-}
+with st.sidebar.expander("Available scenario resources", expanded=False):
+    resources = {
+        "inspection_teams": st.number_input("Inspection teams", 0, 10, 2),
+        "debris_crews": st.number_input("Debris crews", 0, 10, 1),
+        "traffic_units": st.number_input("Traffic units", 0, 10, 1),
+        "emergency_units": st.number_input("Emergency units", 0, 10, 1),
+        "human_reviewers": st.number_input("Human reviewers", 0, 10, 2),
+    }
 
 with st.spinner("Calculating risk and constrained response priorities…"):
     replay_payloads = calculate_replay_payloads(
@@ -311,9 +331,54 @@ allocated = [item for item in recommendations if item["allocation_status"] == "a
 deferred = [item for item in recommendations if item["allocation_status"] == "deferred_resource_limit"]
 usage = resource_usage(recommendations)
 rain = rainfall_summary(frame)
+change_summary = summarize_changes(previous_payload, payload)
+rainfall_history = []
+for history_frame in frames[: frame_index + 1]:
+    history_rain = rainfall_summary(history_frame)
+    rainfall_history.append(
+        {
+            "Time": history_frame["label"],
+            "Intensity (mm/h)": history_rain["max_hourly_mm"],
+            "24h accumulation (mm)": history_rain["max_previous_24h_mm"],
+        }
+    )
 
 st.markdown(f'<span class="mode-badge">{mode}</span>', unsafe_allow_html=True)
 st.title("FloodShift · Storm Operations")
+status_text = (
+    '<span class="running-dot"></span><b>SIMULATION RUNNING</b> · '
+    if st.session_state.playing
+    else "<b>READY FOR JUDGE DEMO</b> · "
+)
+st.markdown(
+    f'<div class="simulation-banner">{status_text}'
+    f'{scenario or "NOAA historical replay"} · Frame {frame_index + 1} of {len(frames)} · '
+    f'{frame["label"]}</div>',
+    unsafe_allow_html=True,
+)
+start_col, play_col, step_col, reset_col, progress_col = st.columns([1.7, 1, 1, 1, 3])
+start_col.button(
+    "▶ Start Storm Simulation",
+    type="primary",
+    width="stretch",
+    on_click=start_judge_simulation,
+)
+play_col.button(
+    "Ⅱ Pause" if st.session_state.playing else "▶ Resume",
+    width="stretch",
+    on_click=toggle_playback,
+)
+step_col.button(
+    "Step →",
+    width="stretch",
+    on_click=step_timeline,
+    args=(1, maximum_frame),
+)
+reset_col.button("↺ Reset", width="stretch", on_click=reset_timeline)
+progress_col.progress(
+    frame_index / maximum_frame if maximum_frame else 1.0,
+    text=f"Storm timeline · {frame['label']} · {rain['max_hourly_mm']:.1f} mm/h",
+)
 st.caption(
     f"Assessment {frame['label']} · {frame['source_label']} · "
     "Estimated decision-support risk, not a calibrated flood probability"
@@ -354,6 +419,18 @@ with left:
         value=False,
         help="Catalog-only locations appear gray and never receive invented scores.",
     )
+    st.markdown(
+        """
+        <div class="severity-legend">
+          <span class="legend-item"><span class="legend-dot" style="background:#2dc789"></span>Low</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#f5b841"></span>Moderate</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#f27433"></span>High</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#e13650"></span>Critical</span>
+          <span class="legend-item">White outline = changed this frame</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     map_rows = build_map_rows(assessments)
     layers = [
         pdk.Layer(
@@ -364,8 +441,8 @@ with left:
             get_radius="radius",
             pickable=True,
             stroked=True,
-            get_line_color=[235, 248, 255, 230],
-            line_width_min_pixels=1,
+            get_line_color="line_color",
+            line_width_min_pixels=2,
             radius_min_pixels=7,
             radius_max_pixels=22,
         )
@@ -408,20 +485,66 @@ with left:
     )
 
 with right:
-    st.subheader("Rainfall progression")
-    rainfall_history = []
-    for history_frame in frames[: frame_index + 1]:
-        summary = rainfall_summary(history_frame)
-        rainfall_history.append(
-            {
-                "Time": history_frame["label"],
-                "Intensity (mm/h)": summary["max_hourly_mm"],
-                "24h accumulation (mm)": summary["max_previous_24h_mm"],
-            }
+    st.subheader("What Changed?")
+    if change_summary["is_baseline"]:
+        change_lines = [
+            "Baseline established from the current rainfall and infrastructure evidence.",
+            "Advance the storm to see risk, ranking, and allocation changes.",
+        ]
+    else:
+        change_lines = []
+        for item in change_summary["risk_increases"][:2]:
+            change_lines.append(
+                f"{item['location_name']} increased {item['delta']:+.1f} to {item['score']:.1f}/100."
+            )
+        for item in change_summary["rank_changes"][:1]:
+            change_lines.append(
+                f"{item['location_name']} moved {item['direction']} from #{item['from_rank']} to #{item['to_rank']}."
+            )
+        if change_summary["new_actions"]:
+            change_lines.append(
+                f"{len(change_summary['new_actions'])} new response action(s) entered the priority list."
+            )
+        if change_summary["newly_allocated"] or change_summary["no_longer_allocated"]:
+            change_lines.append(
+                f"Proposed allocation changed: {len(change_summary['newly_allocated'])} added, "
+                f"{len(change_summary['no_longer_allocated'])} removed."
+            )
+        if change_summary["newly_deferred"]:
+            change_lines.append(
+                f"{len(change_summary['newly_deferred'])} action(s) are newly deferred because resources are limited."
+            )
+        if not change_lines:
+            change_lines.append("No material decision change in this frame; current priorities remain in effect.")
+    st.markdown(
+        '<div class="change-panel">' + "<br>".join(f"• {line}" for line in change_lines) + "</div>",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("#### Highest-risk crossings")
+    for item in assessments[:3]:
+        delta = item["change_from_previous"]
+        delta_label = "Baseline" if delta is None else f"{delta:+.1f} this frame"
+        st.markdown(
+            f'<div class="priority-row"><b>#{item["rank"]} {item["location_name"]}</b>'
+            f'<span style="float:right;color:#f4fbff"><b>{item["risk_score"]:.1f}</b></span><br>'
+            f'<span class="tiny">{item["severity"].title()} · {delta_label}</span></div>',
+            unsafe_allow_html=True,
         )
-    rain_df = pd.DataFrame(rainfall_history).set_index("Time")
-    st.line_chart(rain_df, height=280, color=["#54d2ff", "#f5b841"])
-    st.markdown("#### Scenario resource use")
+
+    st.markdown("#### Proposed response allocation")
+    st.caption("Scenario proposal only—no crew has been moved or dispatched.")
+    if allocated:
+        for item in allocated[:3]:
+            st.markdown(
+                f"**{item['required_resource'] or 'Review'} → {item['location_name']}**  \n"
+                f"{item['action'].replace('_', ' ').title()} · priority {item['priority_score']:.1f}"
+            )
+    else:
+        st.info("No constrained resource is proposed for allocation in this frame.")
+    if deferred:
+        st.warning(f"{len(deferred)} action(s) deferred because available scenario resources are insufficient.")
+
     resource_df = pd.DataFrame(
         [
             {
@@ -432,7 +555,14 @@ with right:
             for key in resources
         ]
     ).set_index("Resource")
-    st.dataframe(resource_df, width="stretch")
+    with st.expander("Resource capacity table", expanded=False):
+        st.dataframe(resource_df, width="stretch")
+    with st.expander("Detailed rainfall chart", expanded=False):
+        st.line_chart(
+            pd.DataFrame(rainfall_history).set_index("Time"),
+            height=180,
+            color=["#54d2ff", "#f5b841"],
+        )
 
 ranked_names = [item["location_name"] for item in assessments]
 selected_name = st.selectbox("Inspect a scored crossing", ranked_names)
