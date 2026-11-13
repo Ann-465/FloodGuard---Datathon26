@@ -29,4 +29,5 @@ def get_storm_frame(scenario: str, step: int) -> dict:
 
 if __name__ == "__main__":
     assert get_storm_frame("Severe", 4)["rainfall_mm_hr"] == 65
+    assert get_storm_frame("Severe", 4)["cumulative_rainfall_mm"] == 25.83
     print("Storm replay checks passed")
