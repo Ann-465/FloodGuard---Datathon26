@@ -1,0 +1,111 @@
+{
+  "retrieved_at": "2026-11-13T18:40:32.991658+00:00",
+  "geographic_scope": "San Antonio/Bexar County, Texas",
+  "date_range": [
+    "2018-01-01",
+    "2025-12-31"
+  ],
+  "satrip": {
+    "row_count": 211,
+    "status_counts": {
+      "2": 196,
+      "3": 11,
+      "1": 3,
+      "4": 1
+    },
+    "source": "https://gis.sanantonio.gov/Satrip/SATripData/floodsensors.csv"
+  },
+  "infrastructure": {
+    "row_count": 8,
+    "buffer_radius_m": 500,
+    "layers": {
+      "inlets": "https://services.arcgis.com/g1fRTDLeMgspWrYp/arcgis/rest/services/StormInlets/FeatureServer/0",
+      "underground_segments": "https://services.arcgis.com/g1fRTDLeMgspWrYp/arcgis/rest/services/StormwaterUnderground/FeatureServer/0",
+      "channel_segments": "https://services.arcgis.com/g1fRTDLeMgspWrYp/arcgis/rest/services/StormChannels/FeatureServer/0"
+    },
+    "method": "0.35*inlet_deficit + 0.25*underground_segment_deficit + 0.40*channel_segment_exposure; fixed caps 150/150/75"
+  },
+  "precipitation": {
+    "row_count": 9905,
+    "station_count": 9,
+    "stations": [
+      {
+        "station_id": "US1TXBXR287",
+        "station_name": "HELOTES 2.0 S, TX US",
+        "longitude": -98.696927,
+        "latitude": 29.53929,
+        "coverage": 78.14968814968815
+      },
+      {
+        "station_id": "US1TXBXR336",
+        "station_name": "CONVERSE 1.2 SSE, TX US",
+        "longitude": -98.3044281005859,
+        "latitude": 29.497371673584,
+        "coverage": 94.24581005586592
+      },
+      {
+        "station_id": "US1TXBXR386",
+        "station_name": "SHAVANO PARK 3.2 WSW, TX US",
+        "longitude": -98.603464,
+        "latitude": 29.566164,
+        "coverage": 91.05960264900662
+      },
+      {
+        "station_id": "US1TXBXR416",
+        "station_name": "SAN ANTONIO 10.4 W, TX US",
+        "longitude": -98.67753,
+        "latitude": 29.46074,
+        "coverage": 70.90592334494772
+      },
+      {
+        "station_id": "US1TXBXR482",
+        "station_name": "SAN ANTONIO 6.0 NNW, TX US",
+        "longitude": -98.54239,
+        "latitude": 29.538045,
+        "coverage": 98.20359281437125
+      },
+      {
+        "station_id": "US1TXBXR564",
+        "station_name": "CHINA GROVE 2.7 ESE, TX US",
+        "longitude": -98.311277,
+        "latitude": 29.374251,
+        "coverage": 87.99546998867497
+      },
+      {
+        "station_id": "US1TXBXR572",
+        "station_name": "SAN ANTONIO 6.0 ENE, TX US",
+        "longitude": -98.412637,
+        "latitude": 29.487933,
+        "coverage": 100.0
+      },
+      {
+        "station_id": "US1TXBXR608",
+        "station_name": "HOLLYWOOD PARK 3.4 ESE, TX US",
+        "longitude": -98.43171,
+        "latitude": 29.58314,
+        "coverage": 79.73568281938326
+      },
+      {
+        "station_id": "USW00012921",
+        "station_name": "SAN ANTONIO INTERNATIONAL AIRPORT, TX US",
+        "latitude": 29.5443,
+        "longitude": -98.484,
+        "coverage": 99.0
+      }
+    ],
+    "source": "https://www.ncei.noaa.gov/access/services/data/v1"
+  },
+  "nfip_claims": {
+    "row_count": 179,
+    "claim_dates": 86,
+    "claims_with_positive_payment": 107,
+    "county_fips": "48029",
+    "source": "https://www.fema.gov/api/open/v3/NfipClaims"
+  },
+  "limitations": [
+    "SATRIP is a current snapshot and some device timestamps are stale.",
+    "NFIP claims cover insured properties only and are county/day labels, not crossing outcomes.",
+    "Mapped asset counts and the derived vulnerability proxy are not hydraulic capacity.",
+    "Station precipitation can miss highly localized rainfall between gauges."
+  ]
+}

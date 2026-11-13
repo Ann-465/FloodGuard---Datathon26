@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+.env
+.ipynb_checkpoints/
+*.egg-info/
+dist/
+build/
+data/raw/
+Texas_Flood_Student_Data/
+

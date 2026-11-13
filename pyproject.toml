@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "floodshift-ai"
+version = "0.1.0"
+description = "Evidence-aware flood risk and emergency-response prioritization"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "openai>=1,<4",
+  "pydantic>=2.8,<3",
+  "pillow>=10,<14",
+  "python-dotenv>=1,<2",
+  "requests>=2.31,<3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10", "pytest-cov>=5,<8", "jupyterlab>=4,<5"]
+vision-eval = ["datasets>=3,<5"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
