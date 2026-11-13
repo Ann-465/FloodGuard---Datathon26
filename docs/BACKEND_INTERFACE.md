@@ -36,6 +36,7 @@ evaluate_flood_risk(
 Results are sorted highest-risk first and contain:
 
 - `risk_score`, `severity`, and `rank`
+- `latitude`, `longitude`, and `evaluated_at`
 - `component_scores`: rainfall /45, infrastructure /30, visual /25
 - `confidence`
 - `evidence`, `uncertainties`, and machine-readable `triggers`
@@ -93,6 +94,21 @@ process_dashboard_update(...) -> dict
 
 It accepts the same arguments and returns a plain dictionary. A complete copy/paste
 example and historical replay instructions are in `docs/FRONTEND_INTEGRATION.md`.
+
+The dashboard dictionary also contains `input_context` (source coverage and
+freshness) and a derived `incident_brief`.
+
+## 5. Generate an incident command brief
+
+```python
+generate_incident_brief(storm_update_or_dashboard_dict) -> IncidentCommandBrief
+```
+
+Normally the frontend should read `payload["incident_brief"]` directly from
+`process_dashboard_update`. The standalone generator is deterministic for the same
+validated storm update and returns both structured JSON-compatible sections and a
+`plain_text` representation. Its safety notice explicitly states that it is not an
+official FEMA/ICS form and that allocations are hypothetical recommendations.
 
 ## Geographic integrity rule
 

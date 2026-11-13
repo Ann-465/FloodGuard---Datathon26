@@ -107,10 +107,19 @@ class VisualEvidence(StrictModel):
     image_reference: str | None = None
     supplied_metadata: dict[str, Any] = Field(default_factory=dict)
 
+    @field_validator("observed_at")
+    @classmethod
+    def normalize_observed_at_timezone(cls, value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+
 
 class RiskAssessment(StrictModel):
     location_id: str
     location_name: str
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
     evaluated_at: datetime
     risk_score: float = Field(ge=0, le=100)
     severity: Severity
@@ -148,12 +157,44 @@ class ResponseRecommendation(StrictModel):
     human_approval_required: bool
 
 
+class InputContext(StrictModel):
+    rainfall_location_count: int = Field(default=0, ge=0)
+    rainfall_observed_from: datetime | None = None
+    rainfall_observed_through: datetime | None = None
+    latest_rainfall_age_minutes: float | None = Field(default=None, ge=0)
+    max_hourly_mm: float | None = Field(default=None, ge=0)
+    max_previous_3h_mm: float | None = Field(default=None, ge=0)
+    max_previous_24h_mm: float | None = Field(default=None, ge=0)
+    rainfall_provenance: list[Provenance] = Field(default_factory=list)
+    visual_observation_count: int = Field(default=0, ge=0)
+    location_verified_visual_count: int = Field(default=0, ge=0)
+    unlocated_visual_count: int = Field(default=0, ge=0)
+    latest_visual_observed_at: datetime | None = None
+    latest_visual_age_minutes: float | None = Field(default=None, ge=0)
+    synthetic_inputs_present: bool = False
+
+
 class StormUpdateResult(StrictModel):
     update_id: str
     evaluated_at: datetime
     risk_assessments: list[RiskAssessment]
     recommendations: list[ResponseRecommendation]
     resources: ResourceAvailability
+    input_context: InputContext = Field(default_factory=InputContext)
     warnings: list[str] = Field(default_factory=list)
     methodology_version: str = "floodshift-0.1"
+
+
+class IncidentCommandBrief(StrictModel):
+    brief_id: str
+    generated_at: datetime
+    title: str = "FloodShift Incident Command Brief"
+    safety_notice: str
+    situation_summary: dict[str, Any]
+    priority_threats: list[dict[str, Any]]
+    recommended_actions: list[dict[str, Any]]
+    resource_situation: dict[str, Any]
+    unverified_information: list[str]
+    decision_summary: str
+    plain_text: str
 

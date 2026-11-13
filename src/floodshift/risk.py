@@ -55,7 +55,13 @@ def _infrastructure_score(location: Location) -> float:
     return crossing + vulnerability + criticality + inlet_factor
 
 
-def _visual_score(observation: VisualEvidence | None) -> float:
+def _visual_age_hours(observation: VisualEvidence | None, evaluated_at: datetime) -> float | None:
+    if not observation or not observation.observed_at:
+        return None
+    return max(0.0, (evaluated_at - observation.observed_at).total_seconds() / 3600.0)
+
+
+def _visual_score(observation: VisualEvidence | None, evaluated_at: datetime) -> float:
     if not observation or observation.analysis_status != AnalysisStatus.SUCCESS:
         return 0.0
     flooding = {EvidenceValue.YES: 8.0, EvidenceValue.UNCERTAIN: 3.0, EvidenceValue.NO: 0.0}[
@@ -72,7 +78,9 @@ def _visual_score(observation: VisualEvidence | None) -> float:
     # Weak model evidence is retained but discounted; it cannot override the
     # numerical rainfall/infrastructure components.
     strength_multiplier = 0.5 + 0.5 * observation.model_reported_evidence_strength
-    return min(25.0, raw * strength_multiplier)
+    age_hours = _visual_age_hours(observation, evaluated_at)
+    freshness_multiplier = 0.5 if age_hours is None else (0.0 if age_hours > 6 else (0.5 if age_hours > 2 else 1.0))
+    return min(25.0, raw * strength_multiplier * freshness_multiplier)
 
 
 def _latest_observation(
@@ -91,6 +99,7 @@ def _confidence(
     location: Location,
     rain: RainfallCondition | None,
     observation: VisualEvidence | None,
+    evaluated_at: datetime,
 ) -> float:
     synthetic_features = bool(location.attributes.get("demo_scoring_attributes_synthetic"))
     infrastructure_quality = 0.20 if (
@@ -99,7 +108,9 @@ def _confidence(
     rainfall_quality = 0.40 if rain and rain.provenance != Provenance.SYNTHETIC else (0.30 if rain else 0.0)
     visual_quality = 0.0
     if observation and observation.analysis_status == AnalysisStatus.SUCCESS:
-        visual_quality = 0.30 * observation.model_reported_evidence_strength
+        age_hours = _visual_age_hours(observation, evaluated_at)
+        freshness = 0.5 if age_hours is None else (0.0 if age_hours > 6 else (0.5 if age_hours > 2 else 1.0))
+        visual_quality = 0.30 * observation.model_reported_evidence_strength * freshness
     return round(min(1.0, infrastructure_quality + rainfall_quality + visual_quality), 3)
 
 
@@ -132,7 +143,7 @@ def evaluate_flood_risk(
         components = {
             "rainfall": round(_rainfall_score(rain), 2) if rain else 0.0,
             "infrastructure": round(_infrastructure_score(location), 2),
-            "visual_observation": round(_visual_score(visual), 2),
+            "visual_observation": round(_visual_score(visual, now), 2),
         }
         score = round(min(100.0, sum(components.values())), 2)
         evidence = [
@@ -166,6 +177,10 @@ def evaluate_flood_risk(
                 f"{rain.previous_24h_mm:.1f} mm/24h"
             )
             provenance.append(rain.provenance)
+            rain_age_hours = max(0.0, (now - rain.timestamp).total_seconds() / 3600.0)
+            if rain_age_hours > 2:
+                uncertainties.append(f"Rainfall observation is {rain_age_hours:.1f} hours old")
+                triggers.append("stale_rainfall")
             if rain.provenance == Provenance.SYNTHETIC:
                 uncertainties.append("Rainfall is a simulated storm-replay input")
                 triggers.append("synthetic_rainfall")
@@ -177,12 +192,28 @@ def evaluate_flood_risk(
             evidence.extend(visual.evidence)
             uncertainties.extend(visual.uncertainties)
             provenance.append(visual.provenance)
-            if visual.visible_flooding == EvidenceValue.YES:
-                triggers.append("visible_flooding")
-            if visual.road_obstructed == EvidenceValue.YES:
-                triggers.append("road_obstructed")
-            if visual.debris_visible == EvidenceValue.YES:
-                triggers.append("debris_visible")
+            visual_age_hours = _visual_age_hours(visual, now)
+            if visual_age_hours is None:
+                uncertainties.append("Visual observation has no verified timestamp and is freshness-discounted")
+                triggers.append("visual_timestamp_missing")
+            elif visual_age_hours > 6:
+                uncertainties.append(f"Visual observation is stale ({visual_age_hours:.1f} hours old) and does not affect current risk")
+                triggers.append("stale_visual_observation")
+            elif visual_age_hours > 2:
+                uncertainties.append(f"Visual observation is aging ({visual_age_hours:.1f} hours old) and is freshness-discounted")
+                triggers.append("aging_visual_observation")
+            # Stale or untimed images remain visible as evidence, but they cannot
+            # trigger consequential response candidates as if they were current.
+            visual_is_actionable = (
+                visual_age_hours is not None and visual_age_hours <= 6
+            )
+            if visual_is_actionable:
+                if visual.visible_flooding == EvidenceValue.YES:
+                    triggers.append("visible_flooding")
+                if visual.road_obstructed == EvidenceValue.YES:
+                    triggers.append("road_obstructed")
+                if visual.debris_visible == EvidenceValue.YES:
+                    triggers.append("debris_visible")
         else:
             uncertainties.append("No successful, location-verified visual observation is available")
             triggers.append("missing_visual_observation")
@@ -203,10 +234,12 @@ def evaluate_flood_risk(
             RiskAssessment(
                 location_id=location.location_id,
                 location_name=location.name,
+                latitude=location.latitude,
+                longitude=location.longitude,
                 evaluated_at=now,
                 risk_score=score,
                 severity=_severity(score),
-                confidence=_confidence(location, rain, visual),
+                confidence=_confidence(location, rain, visual, now),
                 component_scores=components,
                 evidence=evidence,
                 uncertainties=list(dict.fromkeys(uncertainties)),

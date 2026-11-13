@@ -32,10 +32,14 @@ over rainfall-only and infrastructure-only rankings.
 - Historical rainfall validation against real paid OpenFEMA NFIP flood claims, with
   an airport-only baseline and a 2023-2025 temporal holdout.
 - Stable Pydantic/JSON contracts for the teammate's storm replay and dashboard.
-- Fifteen automated unit and integration tests.
+- A deterministic Incident Command Brief with priority threats, resource status,
+  unverified information, and a human-review safety boundary.
+- Observation-freshness discounting, geographic coordinates, and input-freshness
+  context in every dashboard update.
+- Seventeen automated unit and integration tests.
 
-The dashboard and rainfall-replay UI are intentionally outside this repository's
-backend scope.
+The dashboard and rainfall-replay UI remain on the teammate-owned
+`feature/dashboard-replay` branch and are intentionally outside this backend branch.
 
 ## Architecture
 
@@ -79,6 +83,15 @@ independently verified. The expected output includes `visible_flooding`,
 `road_obstructed`, `debris_visible`, ordinal severity, visible evidence, uncertainty,
 and model-reported evidence strength.
 
+Real organizer-server image inference was verified on 13 November 2026 with both a
+local non-flood image and a public-domain
+[FEMA Texas flooded-road photograph](https://commons.wikimedia.org/wiki/File:FEMA_-_37361_-_Flooded_road_in_Texas.jpg).
+For the flood photograph, Qwen returned schema-valid `yes` observations for visible
+flooding and road obstruction, `no` for debris, severity 3, and concrete supporting
+evidence. Its location remained unset, so it did not update a San Antonio score.
+These two smoke tests verify live structured inference and guardrails, not population-
+level visual accuracy; use the optional LADI benchmark for a labeled estimate.
+
 ```python
 from floodshift import analyze_flood_image
 
@@ -110,9 +123,9 @@ to San Antonio locations.
 ## Backend integration
 
 ```python
-from floodshift import process_storm_update
+from floodshift import process_dashboard_update
 
-result = process_storm_update(
+dashboard_payload = process_dashboard_update(
     rainfall=rainfall_updates,
     observations=visual_observations,
     resources={
@@ -123,11 +136,13 @@ result = process_storm_update(
         "human_reviewers": 2,
     },
     locations=infrastructure_locations,
-    previous_assessments=previous_result.risk_assessments if previous_result else [],
+    previous_assessments=previous_payload["risk_assessments"] if previous_payload else [],
+    evaluated_at=current_frame["timestamp"],
 )
-
-dashboard_payload = result.model_dump(mode="json")
 ```
+
+The returned dictionary includes `risk_assessments`, `recommendations`,
+`input_context`, and `incident_brief` (both structured sections and `plain_text`).
 
 See [`docs/BACKEND_INTERFACE.md`](docs/BACKEND_INTERFACE.md) for complete contracts.
 
@@ -173,15 +188,15 @@ python examples/run_demo.py
 
 The bundled illustrative scenario currently produces this top-three comparison:
 
-| Method | NDCG@3 | Interpretation |
-|---|---:|---|
-| Rainfall only | 0.6151 | Misses the visually confirmed high-urgency crossing |
-| Infrastructure only | 0.3975 | Static asset density misses changing storm evidence |
-| Full multimodal | **0.8786** | Ranks the visually confirmed urgent crossing first |
+| Method | NDCG@3 | Urgent recall@3 | Interpretation |
+|---|---:|---:|---|
+| Rainfall only | 0.6151 | **0.75** | Strong urgent recall but weaker graded ranking |
+| Infrastructure only | 0.3975 | 0.25 | Static asset density misses changing storm evidence |
+| Full multimodal | **0.8786** | 0.50 | Best graded ranking; does not beat rainfall-only recall |
 
-These values demonstrate behavior on a human-authored synthetic scenario. They do
-not establish calibrated flood probability, operational safety, prevented damage, or
-real-world superiority.
+These values demonstrate behavior on a human-authored synthetic scenario. The full
+system improves NDCG@3 but not urgent recall@3, so they do not establish calibrated
+flood probability, operational safety, prevented damage, or real-world superiority.
 
 ### Real historical rainfall validation
 

@@ -99,4 +99,6 @@ def test_dashboard_adapter_returns_json_safe_contract():
     assert isinstance(payload["evaluated_at"], str)
     assert payload["risk_assessments"]
     assert payload["recommendations"]
+    assert payload["input_context"]["rainfall_location_count"] == 8
+    assert payload["incident_brief"]["plain_text"]
 

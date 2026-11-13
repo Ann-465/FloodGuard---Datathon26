@@ -45,7 +45,7 @@ def test_location_is_never_inferred(monkeypatch, tmp_path: Path):
 
 def test_missing_server_configuration_returns_fallback(monkeypatch, tmp_path: Path):
     for name in ("FLOODSHIFT_VLM_BASE_URL", "FLOODSHIFT_VLM_MODEL", "FLOODSHIFT_VLM_API_KEY"):
-        monkeypatch.delenv(name, raising=False)
+        monkeypatch.setenv(name, "")
     image = tmp_path / "photo.jpg"
     image.write_bytes(b"fixture")
     result = QwenVisionClient().analyze(image)

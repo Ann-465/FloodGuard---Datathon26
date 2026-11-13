@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from pathlib import Path
 
 from floodshift.evaluation import compare_ranking_baselines
+from floodshift.incident import generate_incident_brief
 from floodshift.infrastructure import load_locations
 from floodshift.pipeline import process_storm_update
 
@@ -34,6 +36,7 @@ def main() -> None:
             scenario["resources"],
             locations=locations,
             previous_assessments=previous,
+            evaluated_at=datetime.fromisoformat(step["timestamp"]),
         )
         results.append(result)
         previous = result.risk_assessments
@@ -59,6 +62,7 @@ def main() -> None:
         "scenario": scenario["scenario_name"],
         "data_policy": scenario["data_policy"],
         "storm_updates": [item.model_dump(mode="json") for item in results],
+        "incident_brief": generate_incident_brief(results[-1]).model_dump(mode="json"),
         "baseline_evaluation": evaluation,
     }
     print(json.dumps(payload, indent=2))
