@@ -11,4 +11,9 @@ dist/
 build/
 data/raw/
 Texas_Flood_Student_Data/
-
+.DS_Store
+data/processed/
+models/
+*.pt
+*.pth
+*.safetensors
