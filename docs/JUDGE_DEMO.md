@@ -4,7 +4,7 @@
 
 ```powershell
 conda activate floodshift
-python -m pip install -e ".[dashboard]"
+python -m pip install --no-build-isolation -e ".[dashboard]"
 python -m streamlit run frontend/dashboard.py
 ```
 

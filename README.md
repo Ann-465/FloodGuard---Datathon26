@@ -58,7 +58,7 @@ Qwen visual evidence ──┘       │                                      �
 ```powershell
 conda create -n floodshift python=3.11 pip -y
 conda activate floodshift
-python -m pip install -e ".[dev,dashboard]"
+python -m pip install --no-build-isolation -e ".[dev,dashboard]"
 python -m pytest -q
 python examples/run_demo.py
 python -m streamlit run frontend/dashboard.py
